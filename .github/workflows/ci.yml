@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  actionlint:
+    name: Validate workflow YAML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          "$(go env GOPATH)/bin/actionlint" -color -shellcheck=""
