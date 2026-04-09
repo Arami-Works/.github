@@ -2,6 +2,11 @@ name: Auto-update PR branches
 
 on:
   workflow_call:
+    secrets:
+      CLAUDE_ARAMI_APP_ID:
+        required: true
+      CLAUDE_ARAMI_PRIVATE_KEY:
+        required: true
 
 permissions:
   pull-requests: write
@@ -11,9 +16,16 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.CLAUDE_ARAMI_APP_ID }}
+          private-key: ${{ secrets.CLAUDE_ARAMI_PRIVATE_KEY }}
+
       - name: Update open PR branches
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json number -q '.[].number')
           for pr in $prs; do
