@@ -73,6 +73,7 @@ jobs:
         with:
           app-id: ${{ secrets.CLAUDE_ARAMI_APP_ID }}
           private-key: ${{ secrets.CLAUDE_ARAMI_PRIVATE_KEY }}
+          owner: aramiworks
 
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -95,9 +96,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version }}
+          registry-url: https://npm.pkg.github.com
+          scope: '@aramiworks'
 
       - name: Install Node dependencies
         if: steps.skip-check.outputs.skip != 'true' && inputs.python_version == ''
+        env:
+          NODE_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: npm ci
 
       - name: Setup Python
