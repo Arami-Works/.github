@@ -159,13 +159,6 @@ jobs:
       needs.resolve-pr.outputs.has_pr == 'true' &&
       needs.resolve-pr.result == 'success' &&
       github.event.workflow_run.name == 'CI'
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      id-token: write
-      actions: read
-      statuses: read
     steps:
       - name: Check for ci-autofix label
         id: label-check
@@ -290,10 +283,6 @@ jobs:
       needs.resolve-pr.outputs.has_pr == 'true' &&
       github.event.workflow_run.name == 'changeset' &&
       github.event.workflow_run.conclusion == 'failure'
-    permissions:
-      contents: write
-      pull-requests: write
-      id-token: write
     steps:
       - name: Generate GitHub App token
         id: app-token
