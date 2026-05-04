@@ -85,11 +85,11 @@ jobs:
           ref: ${{ needs.resolve-pr.outputs.head_branch }}
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Skip if last commit was from bot
+      - name: Skip if last commit was an auto-fix
         id: skip-check
         run: |
-          last_author=$(git log -1 --pretty=format:'%ae')
-          if echo "$last_author" | grep -qiE 'aramiworks|claude|github-actions'; then
+          last_msg=$(git log -1 --pretty=format:'%s')
+          if echo "$last_msg" | grep -qiE '^style: auto-fix'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -134,6 +134,7 @@ jobs:
 
       - name: Commit and push if changed
         if: steps.skip-check.outputs.skip != 'true'
+        id: commit-push
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -142,6 +143,7 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "No formatting/lint changes needed"
+            echo "fixed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "style: auto-fix format/lint
@@ -149,6 +151,19 @@ jobs:
           Co-Authored-By: claude-arami[bot] <claude-arami[bot]@users.noreply.github.com>"
           git pull --rebase origin ${{ needs.resolve-pr.outputs.head_branch }} || true
           git push origin ${{ needs.resolve-pr.outputs.head_branch }}
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "fixed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        if: steps.skip-check.outputs.skip != 'true' && steps.commit-push.outputs.fixed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh pr comment ${{ needs.resolve-pr.outputs.pr_number }} \
+            --repo ${{ github.repository }} \
+            --body "**CI autofix:** format/lint errors corrected automatically.
+
+          Commit: ${{ steps.commit-push.outputs.commit_sha }}"
 
   claude-fix:
     name: Claude Fix (test/typecheck/build/codecov)
@@ -195,14 +210,15 @@ jobs:
           echo "claude_failures=$CLAUDE_FAILURES" >> "$GITHUB_OUTPUT"
           echo "has_claude_failures=$( [ -n "$CLAUDE_FAILURES" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if last commit was from bot
+      - name: Skip if last commit was an auto-fix
         if: steps.label-check.outputs.skip != 'true' && steps.failures.outputs.has_claude_failures == 'true'
         id: skip-check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          AUTHOR=$(gh api repos/${{ github.repository }}/commits/${{ needs.resolve-pr.outputs.head_sha }} --jq '.author.login // ""')
-          if echo "$AUTHOR" | grep -qiE 'claude-arami|github-actions'; then
+          MSG=$(gh api repos/${{ github.repository }}/commits/${{ needs.resolve-pr.outputs.head_sha }} --jq '.commit.message')
+          SUBJECT=$(echo "$MSG" | head -1)
+          if echo "$SUBJECT" | grep -qiE '^(fix|test|style): (auto-fix|ci autofix)'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -260,9 +276,13 @@ jobs:
             Rules:
             - Use descriptive commit messages: `fix: ...` or `test: ...`
             - Do not modify files unrelated to the failures.
-            - If a failure is pre-existing (also fails on main), skip it and post a PR comment explaining why.
+            - If a failure is pre-existing (also fails on main), skip it and note it in the summary comment.
             - Keep changes minimal and focused.
             - Do NOT fix formatting or lint issues — those are handled by the script tier.
+            - **Always** post a PR comment when done (whether you fixed something or not) with:
+              - What failed and what you did (fixed / skipped / pre-existing)
+              - Commit SHA if code was changed
+              - Use `gh pr comment ${{ needs.resolve-pr.outputs.pr_number }} --repo ${{ github.repository }} --body "..."`
 
       - name: Add ci-autofix label
         if: >
@@ -314,12 +334,12 @@ jobs:
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if last commit was from bot
+      - name: Skip if last commit was an auto-add changeset
         if: steps.precheck.outputs.skip != 'true'
         id: skip-check
         run: |
-          last_author=$(git log -1 --pretty=format:'%ae')
-          if echo "$last_author" | grep -qiE 'aramiworks|claude|github-actions'; then
+          last_msg=$(git log -1 --pretty=format:'%s')
+          if echo "$last_msg" | grep -qiE '^chore: auto-add changeset'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -435,6 +455,7 @@ jobs:
 
       - name: Commit and push
         if: steps.precheck.outputs.skip != 'true' && steps.skip-check.outputs.skip != 'true' && steps.gen.outputs.created == 'true'
+        id: commit-push
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -453,6 +474,19 @@ jobs:
           Co-Authored-By: claude-arami[bot] <claude-arami[bot]@users.noreply.github.com>"
           git pull --rebase origin "${{ needs.resolve-pr.outputs.head_branch }}" || true
           git push origin "${{ needs.resolve-pr.outputs.head_branch }}"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        if: steps.precheck.outputs.skip != 'true' && steps.skip-check.outputs.skip != 'true' && steps.gen.outputs.created == 'true' && steps.commit-push.outputs.commit_sha != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh pr comment ${{ needs.resolve-pr.outputs.pr_number }} \
+            --repo ${{ github.repository }} \
+            --body "**CI autofix:** missing changeset added automatically.
+
+          Packages: \`${{ steps.gen.outputs.packages }}\` (bump: ${{ steps.gen.outputs.bump }})
+          Commit: ${{ steps.commit-push.outputs.commit_sha }}"
 
   conflict-fix:
     name: Conflict Fix (auto-resolve merge conflicts)
