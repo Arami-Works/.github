@@ -85,11 +85,11 @@ jobs:
           ref: ${{ needs.resolve-pr.outputs.head_branch }}
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Skip if last commit was from bot
+      - name: Skip if last commit was an auto-fix
         id: skip-check
         run: |
-          last_author=$(git log -1 --pretty=format:'%ae')
-          if echo "$last_author" | grep -qiE 'aramiworks|claude|github-actions'; then
+          last_msg=$(git log -1 --pretty=format:'%s')
+          if echo "$last_msg" | grep -qiE '^style: auto-fix'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -195,14 +195,15 @@ jobs:
           echo "claude_failures=$CLAUDE_FAILURES" >> "$GITHUB_OUTPUT"
           echo "has_claude_failures=$( [ -n "$CLAUDE_FAILURES" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if last commit was from bot
+      - name: Skip if last commit was an auto-fix
         if: steps.label-check.outputs.skip != 'true' && steps.failures.outputs.has_claude_failures == 'true'
         id: skip-check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          AUTHOR=$(gh api repos/${{ github.repository }}/commits/${{ needs.resolve-pr.outputs.head_sha }} --jq '.author.login // ""')
-          if echo "$AUTHOR" | grep -qiE 'claude-arami|github-actions'; then
+          MSG=$(gh api repos/${{ github.repository }}/commits/${{ needs.resolve-pr.outputs.head_sha }} --jq '.commit.message')
+          SUBJECT=$(echo "$MSG" | head -1)
+          if echo "$SUBJECT" | grep -qiE '^(fix|test|style): (auto-fix|ci autofix)'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -314,12 +315,12 @@ jobs:
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if last commit was from bot
+      - name: Skip if last commit was an auto-add changeset
         if: steps.precheck.outputs.skip != 'true'
         id: skip-check
         run: |
-          last_author=$(git log -1 --pretty=format:'%ae')
-          if echo "$last_author" | grep -qiE 'aramiworks|claude|github-actions'; then
+          last_msg=$(git log -1 --pretty=format:'%s')
+          if echo "$last_msg" | grep -qiE '^chore: auto-add changeset'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
