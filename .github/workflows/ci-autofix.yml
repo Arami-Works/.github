@@ -332,7 +332,7 @@ jobs:
         run: |
           BASE_REF=$(gh api repos/${{ github.repository }}/pulls/${{ needs.resolve-pr.outputs.pr_number }} --jq '.base.ref')
           echo "BASE_REF=$BASE_REF" >> "$GITHUB_ENV"
-          git fetch origin "$BASE_REF" --depth=1
+          git fetch origin "$BASE_REF"
 
       - name: Generate changeset
         if: steps.precheck.outputs.skip != 'true' && steps.skip-check.outputs.skip != 'true'
