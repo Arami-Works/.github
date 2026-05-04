@@ -149,10 +149,15 @@ jobs:
           git commit -m "style: auto-fix format/lint
 
           Co-Authored-By: claude-arami[bot] <claude-arami[bot]@users.noreply.github.com>"
-          git pull --rebase origin ${{ needs.resolve-pr.outputs.head_branch }} || true
-          git push origin ${{ needs.resolve-pr.outputs.head_branch }}
-          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "fixed=true" >> "$GITHUB_OUTPUT"
+          if git pull --rebase origin ${{ needs.resolve-pr.outputs.head_branch }}; then
+            git push origin ${{ needs.resolve-pr.outputs.head_branch }}
+            echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            echo "fixed=true" >> "$GITHUB_OUTPUT"
+          else
+            git rebase --abort || true
+            echo "Rebase conflicted with a concurrent branch update; push skipped"
+            echo "fixed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Post PR comment
         if: steps.skip-check.outputs.skip != 'true' && steps.commit-push.outputs.fixed == 'true'
@@ -472,9 +477,13 @@ jobs:
           Bump: ${{ steps.gen.outputs.bump }}
 
           Co-Authored-By: claude-arami[bot] <claude-arami[bot]@users.noreply.github.com>"
-          git pull --rebase origin "${{ needs.resolve-pr.outputs.head_branch }}" || true
-          git push origin "${{ needs.resolve-pr.outputs.head_branch }}"
-          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if git pull --rebase origin "${{ needs.resolve-pr.outputs.head_branch }}"; then
+            git push origin "${{ needs.resolve-pr.outputs.head_branch }}"
+            echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            git rebase --abort || true
+            echo "Rebase conflicted with a concurrent branch update; push skipped"
+          fi
 
       - name: Post PR comment
         if: steps.precheck.outputs.skip != 'true' && steps.skip-check.outputs.skip != 'true' && steps.gen.outputs.created == 'true' && steps.commit-push.outputs.commit_sha != ''
