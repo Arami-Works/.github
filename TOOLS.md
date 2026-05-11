@@ -4,7 +4,7 @@ Installed tools, bots, and GitHub Apps across the `aramiworks` workspace.
 
 | Tool | Type | Purpose | Repos | Status | Installed |
 |------|------|---------|-------|--------|-----------|
-| [Greptile](https://greptile.com) | GitHub App (AI Review) | AI-powered PR code review | All | ✅ Active | 2026-03-05 |
+| Claude Review | Reusable workflow | AI-powered PR code review (replaces Greptile) | All | ✅ Active | 2026-05-11 |
 | [arami-openclaw-bot](https://github.com/apps/arami-openclaw-bot) | GitHub App (Bot) | Bot commits for automation | All | ✅ Active | 2026-03-05 |
 
 ---
